@@ -190,7 +190,12 @@ static int shrinker_compress (void *in, int size, void *out, int out_size)
     flag |= 7 + 16; // any number
     *pflag = flag;
     *dst++ = 0xff; *dst++ = 0xff;
-    MEMCPY_NOOVERLAP_NOSURPASS(dst, p_last_lit, src);
+#if ULONG_MAX == UINT_MAX //32bit
+	if (dst + (src - p_last_lit - 4) > dst_end) return -1;
+#else
+	if (dst + (src - p_last_lit - 8) > dst_end) return -1;
+#endif
+	MEMCPY_NOOVERLAP_NOSURPASS(dst, p_last_lit, src);
 
     if (dst > dst_end) return -1;
     else return (int)(dst - (u8*)out);
@@ -388,7 +393,7 @@ clz_FILE *clz_fopen (const char *file, const char *mode, int alg, int blk_cfg)
 		// read first head and check magic number
 		pFile = bStdInOut ? stdin : fopen (file, "rb");
 		if (NULL == pFile) {
-		printf ("Can't open %s\n", file);
+			clz_debug ("Can't open %s\n", file);
 			return NULL;
 		}
 		len = (int)fread (clz_hdr_file, 1, sizeof(clz_clzhdr_t)+CLZ_LEN_SIZE, pFile);
@@ -442,7 +447,7 @@ clz_FILE *clz_fopen (const char *file, const char *mode, int alg, int blk_cfg)
 		return NULL;
 	}
 
-	pClzFile = clz_malloc (sizeof (clz_FILE) - 1 + bCompress ? (block_max*2 + CLZ_LEN_SIZE*2) : 0);
+	pClzFile = clz_malloc (sizeof (clz_FILE) - 1 + (bCompress ? (block_max*2 + CLZ_LEN_SIZE*2) : 0));
 	if (NULL == pClzFile) {
 		if (!bStdInOut) {
 			fclose (pFile);
